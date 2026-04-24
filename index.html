@@ -747,53 +747,7 @@ function dismissWarning() {
   <div id="panorama-wrap" style="display:none;width:100%;height:100%;position:relative;">
     <canvas id="pano-canvas" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
     <div id="pano-hint" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);opacity:0.7;letter-spacing:1px;pointer-events:none;">DRAG TO LOOK AROUND · SCROLL TO ZOOM</div>
-    <!-- DEBUG PANEL -->
-    <div id="pano-debug" style="
-      position:absolute;top:16px;left:16px;
-      background:rgba(10,10,16,0.92);
-      border:1px solid var(--amber);
-      padding:12px 16px;
-      font-family:var(--mono);
-      font-size:11px;
-      color:var(--amber);
-      letter-spacing:1px;
-      min-width:220px;
-      border-radius:2px;
-      pointer-events:all;
-    ">
-      <div style="margin-bottom:8px;font-size:10px;letter-spacing:2px;opacity:0.7;">⚙ PANO DEBUG</div>
-      <div style="margin-bottom:6px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span>PANEL ANGLE</span>
-          <span id="pano-angle-val" style="color:var(--green);">90°</span>
-        </div>
-        <input id="pano-angle-slider" type="range" min="60" max="120" value="90" step="1"
-          style="width:100%;accent-color:var(--green);cursor:pointer;"
-          oninput="onPanoAngleChange(this.value)">
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;">
-          <span>60° (overlap)</span><span>90° (default)</span><span>120° (gap)</span>
-        </div>
-      </div>
-      <div style="margin-bottom:6px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span>VERT SCALE</span>
-          <span id="pano-vscale-val" style="color:var(--green);">1.5×</span>
-        </div>
-        <input id="pano-vscale-slider" type="range" min="0.5" max="3.0" value="1.5" step="0.05"
-          style="width:100%;accent-color:var(--green);cursor:pointer;"
-          oninput="onPanoVScaleChange(this.value)">
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span>RADIUS</span>
-          <span id="pano-radius-val" style="color:var(--green);">50</span>
-        </div>
-        <input id="pano-radius-slider" type="range" min="10" max="200" value="50" step="1"
-          style="width:100%;accent-color:var(--green);cursor:pointer;"
-          oninput="onPanoRadiusChange(this.value)">
-      </div>
-      <div style="margin-top:10px;font-size:9px;color:var(--text-dim);letter-spacing:0.5px;">adjust until seams line up</div>
-    </div>
+
   </div>
 </div>
 
@@ -1114,8 +1068,8 @@ function openPanorama(urls) {
   }))).then(imgs => buildPanorama(canvas, imgs));
 }
 
-// Panorama tuning params (live-editable via debug sliders)
-let panoParams = { angleDeg: 90, vScale: 1.5, radius: 50 };
+// Panorama tuning params
+let panoParams = { angleDeg: 108, vScale: 2.05, radius: 50 };
 let panoImgsCache = null;
 let panoMeshes = [];
 
@@ -1183,21 +1137,7 @@ function buildPanoPanels() {
   }
 }
 
-function onPanoAngleChange(val) {
-  panoParams.angleDeg = parseFloat(val);
-  document.getElementById('pano-angle-val').textContent = val + '°';
-  if (panoImgsCache) buildPanoPanels();
-}
-function onPanoVScaleChange(val) {
-  panoParams.vScale = parseFloat(val);
-  document.getElementById('pano-vscale-val').textContent = parseFloat(val).toFixed(2) + '×';
-  if (panoImgsCache) buildPanoPanels();
-}
-function onPanoRadiusChange(val) {
-  panoParams.radius = parseFloat(val);
-  document.getElementById('pano-radius-val').textContent = val;
-  if (panoImgsCache) buildPanoPanels();
-}
+
 
 function panoMouseDown(e) {
   panoDragging = true;
