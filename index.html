@@ -747,6 +747,53 @@ function dismissWarning() {
   <div id="panorama-wrap" style="display:none;width:100%;height:100%;position:relative;">
     <canvas id="pano-canvas" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
     <div id="pano-hint" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);opacity:0.7;letter-spacing:1px;pointer-events:none;">DRAG TO LOOK AROUND · SCROLL TO ZOOM</div>
+    <!-- DEBUG PANEL -->
+    <div id="pano-debug" style="
+      position:absolute;top:16px;left:16px;
+      background:rgba(10,10,16,0.92);
+      border:1px solid var(--amber);
+      padding:12px 16px;
+      font-family:var(--mono);
+      font-size:11px;
+      color:var(--amber);
+      letter-spacing:1px;
+      min-width:220px;
+      border-radius:2px;
+      pointer-events:all;
+    ">
+      <div style="margin-bottom:8px;font-size:10px;letter-spacing:2px;opacity:0.7;">⚙ PANO DEBUG</div>
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>PANEL ANGLE</span>
+          <span id="pano-angle-val" style="color:var(--green);">90°</span>
+        </div>
+        <input id="pano-angle-slider" type="range" min="60" max="120" value="90" step="1"
+          style="width:100%;accent-color:var(--green);cursor:pointer;"
+          oninput="onPanoAngleChange(this.value)">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;">
+          <span>60° (overlap)</span><span>90° (default)</span><span>120° (gap)</span>
+        </div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>VERT SCALE</span>
+          <span id="pano-vscale-val" style="color:var(--green);">1.5×</span>
+        </div>
+        <input id="pano-vscale-slider" type="range" min="0.5" max="3.0" value="1.5" step="0.05"
+          style="width:100%;accent-color:var(--green);cursor:pointer;"
+          oninput="onPanoVScaleChange(this.value)">
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>RADIUS</span>
+          <span id="pano-radius-val" style="color:var(--green);">50</span>
+        </div>
+        <input id="pano-radius-slider" type="range" min="10" max="200" value="50" step="1"
+          style="width:100%;accent-color:var(--green);cursor:pointer;"
+          oninput="onPanoRadiusChange(this.value)">
+      </div>
+      <div style="margin-top:10px;font-size:9px;color:var(--text-dim);letter-spacing:0.5px;">adjust until seams line up</div>
+    </div>
   </div>
 </div>
 
@@ -1067,7 +1114,14 @@ function openPanorama(urls) {
   }))).then(imgs => buildPanorama(canvas, imgs));
 }
 
+// Panorama tuning params (live-editable via debug sliders)
+let panoParams = { angleDeg: 90, vScale: 1.5, radius: 50 };
+let panoImgsCache = null;
+let panoMeshes = [];
+
 function buildPanorama(canvas, imgs) {
+  panoImgsCache = imgs;
+
   // Set canvas size
   const wrap = document.getElementById('panorama-wrap');
   canvas.width = wrap.clientWidth;
@@ -1078,33 +1132,10 @@ function buildPanorama(canvas, imgs) {
   panoRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
 
   panoScene = new THREE.Scene();
-  panoCamera = new THREE.PerspectiveCamera(75, wrap.clientWidth / wrap.clientHeight, 0.1, 100);
+  panoCamera = new THREE.PerspectiveCamera(75, wrap.clientWidth / wrap.clientHeight, 0.1, 1000);
   panoCamera.position.set(0, 0, 0);
 
-  // The 4 images are taken 90° apart (view_1=N, view_2=E, view_3=S, view_4=W)
-  // We place them as 4 quad faces of a cylinder (equirectangular approximation via box faces)
-  // Each image covers a 90° horizontal wedge on a large sphere
-  const radius = 50;
-  const faceAngles = [0, -Math.PI/2, Math.PI, Math.PI/2]; // N, E, S, W in Three.js (Z-forward = 0 rotation)
-
-  for (let i = 0; i < 4; i++) {
-    const tex = new THREE.CanvasTexture(imgs[i]);
-    tex.minFilter = THREE.LinearFilter;
-    const geo = new THREE.PlaneGeometry(
-      2 * radius * Math.tan(Math.PI / 4), // width = 2 * r * tan(45°) = 2r
-      radius * 1.5 // tall enough to fill vertical FOV
-    );
-    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
-    const mesh = new THREE.Mesh(geo, mat);
-    // Position each panel at radius distance, rotated around Y
-    mesh.position.set(
-      radius * Math.sin(faceAngles[i]),
-      0,
-      radius * Math.cos(faceAngles[i])
-    );
-    mesh.rotation.y = faceAngles[i];
-    panoScene.add(mesh);
-  }
+  buildPanoPanels();
 
   // Mouse drag controls
   canvas.addEventListener('mousedown', panoMouseDown);
@@ -1115,13 +1146,57 @@ function buildPanorama(canvas, imgs) {
 
   function panoLoop() {
     panoAnimId = requestAnimationFrame(panoLoop);
-    // Apply yaw/pitch to camera via quaternion
     const q = new THREE.Quaternion();
     q.setFromEuler(new THREE.Euler(panoPitch, panoYaw, 0, 'YXZ'));
     panoCamera.quaternion.copy(q);
     panoRenderer.render(panoScene, panoCamera);
   }
   panoLoop();
+}
+
+function buildPanoPanels() {
+  // Remove old panels
+  for (const m of panoMeshes) panoScene.remove(m);
+  panoMeshes = [];
+
+  const { angleDeg, vScale, radius } = panoParams;
+  const angleRad = angleDeg * Math.PI / 180;
+  // Each panel width = 2 * r * tan(halfAngle)
+  const panelW = 2 * radius * Math.tan(angleRad / 2);
+  const panelH = radius * vScale;
+  const faceAngles = [0, -Math.PI/2, Math.PI, Math.PI/2]; // N, E, S, W
+
+  for (let i = 0; i < 4; i++) {
+    const tex = new THREE.CanvasTexture(panoImgsCache[i]);
+    tex.minFilter = THREE.LinearFilter;
+    const geo = new THREE.PlaneGeometry(panelW, panelH);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(
+      radius * Math.sin(faceAngles[i]),
+      0,
+      radius * Math.cos(faceAngles[i])
+    );
+    mesh.rotation.y = faceAngles[i];
+    panoScene.add(mesh);
+    panoMeshes.push(mesh);
+  }
+}
+
+function onPanoAngleChange(val) {
+  panoParams.angleDeg = parseFloat(val);
+  document.getElementById('pano-angle-val').textContent = val + '°';
+  if (panoImgsCache) buildPanoPanels();
+}
+function onPanoVScaleChange(val) {
+  panoParams.vScale = parseFloat(val);
+  document.getElementById('pano-vscale-val').textContent = parseFloat(val).toFixed(2) + '×';
+  if (panoImgsCache) buildPanoPanels();
+}
+function onPanoRadiusChange(val) {
+  panoParams.radius = parseFloat(val);
+  document.getElementById('pano-radius-val').textContent = val;
+  if (panoImgsCache) buildPanoPanels();
 }
 
 function panoMouseDown(e) {
@@ -1158,6 +1233,7 @@ function stopPanorama() {
   window.removeEventListener('mouseup', panoMouseUp);
   if (panoRenderer) { panoRenderer.dispose(); panoRenderer = null; }
   panoScene = null; panoCamera = null;
+  panoImgsCache = null; panoMeshes = [];
 }
 
 // ═══════════════════════════════════════════════════════
