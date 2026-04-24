@@ -941,18 +941,26 @@ function selectProbe(p) {
     if (urls.length > 0) {
       const availableViews = [];
       for (let i = 0; i < Math.min(4, urls.length); i++) {
-        const url = urls[i];
+        const url = urls[i].split('/').map(encodeURIComponent).join('/');
         availableViews.push(url);
         const slot = document.createElement('div');
         slot.className = 'screenshot-slot';
-        slot.innerHTML = `<img src="${url}" alt="View ${i+1}"><div class="view-label">VIEW ${i+1}</div>`;
+        const img = document.createElement('img');
+        img.alt = `View ${i+1}`;
+        img.src = url;
+        img.onerror = () => { img.style.display='none'; slot.style.background='var(--panel2)'; };
+        const lbl = document.createElement('div');
+        lbl.className = 'view-label';
+        lbl.textContent = `VIEW ${i+1}`;
+        slot.appendChild(img);
+        slot.appendChild(lbl);
         slot.onclick = () => openLightbox(url);
         ss.appendChild(slot);
       }
       if (availableViews.length === 4) {
         const pb = document.createElement('button');
         pb.className = 'pano-btn';
-        pb.textContent = '⊕ VIEW 360° PANORAMA';
+        pb.textContent = '⊕ PANORAMA';
         pb.onclick = () => openPanorama(availableViews);
         ss.appendChild(pb);
       }
@@ -1060,16 +1068,22 @@ function openPanorama(urls) {
   stopPanorama();
 
   // Load all 4 images then build the scene
-  Promise.all(urls.map(u => new Promise((res, rej) => {
+  Promise.all(urls.map(u => new Promise((res) => {
     const img = new Image();
     img.onload = () => res(img);
-    img.onerror = rej;
+    img.onerror = () => res(null);
     img.src = u;
-  }))).then(imgs => buildPanorama(canvas, imgs));
+  }))).then(imgs => {
+    if (imgs.some(i => i === null)) {
+      closeLightbox();
+      return;
+    }
+    buildPanorama(canvas, imgs);
+  });
 }
 
 // Panorama tuning params
-let panoParams = { angleDeg: 108, vScale: 2.05, radius: 50 };
+let panoParams = { angleDeg: 108, vScale: 1.5, radius: 50 };
 let panoImgsCache = null;
 let panoMeshes = [];
 
