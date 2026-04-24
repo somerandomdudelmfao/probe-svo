@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>probe</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #050508;
+    --panel: #0a0a10;
+    --panel2: #0f0f18;
+    --border: #1a1a2e;
+    --border2: #22223a;
+    --green: #00ff88;
+    --green2: #00cc66;
+    --green-dim: #00ff8833;
+    --amber: #ffaa00;
+    --amber-dim: #ffaa0022;
+    --red: #ff4444;
+    --red-dim: #ff444422;
+    --cyan: #00ccff;
+    --cyan-dim: #00ccff22;
+    --text: #c8c8d8;
+    --text-dim: #606080;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before { */
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border2);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--sans);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--text-dim); font-weight: 300; }
+  .status-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .dot.amber { background: var(--amber); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    grid-template-rows: auto 1fr;
+    height: calc(100vh - 56px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    grid-row: 1 / 3;
+    border-right: 1px solid var(--border2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border2);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 8px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .tab:hover:not(.active) { color: var(--text); background: var(--panel2); }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* PROBE LIST */
+  .probe-list-header {
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .probe-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .probe-count strong { color: var(--green); }
+  .probe-list { overflow-y: auto; flex: 1; }
+  .probe-list::-webkit-scrollbar { width: 4px; }
+  .probe-list::-webkit-scrollbar-track { background: var(--panel); }
+  .probe-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .probe-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .probe-item:hover { background: var(--panel2); }
+  .probe-item.selected { background: var(--green-dim); border-left: 2px solid var(--green); }
+  .probe-item-map {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  .probe-item-seed {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+  .probe-item-coords {
+    font-size: 10px;
+    color: var(--cyan);
+    margin-top: 2px;
+  }
+
+  /* DETAIL PANEL */
+  .detail-panel {
+    padding: 16px;
+    border-top: 1px solid var(--border2);
+    background: var(--panel2);
+    flex-shrink: 0;
+  }
+  .detail-panel h3 {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--amber);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: var(--text-dim); }
+  .detail-value { color: var(--text); text-align: right; }
+  .detail-value.green { color: var(--green); }
+  .detail-value.cyan { color: var(--cyan); }
+  .detail-value.amber { color: var(--amber); }
+
+  /* SCREENSHOTS */
+  .screenshots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border2);
+    flex-shrink: 0;
+  }
+  .screenshot-slot {
+    aspect-ratio: 16/9;
+    background: var(--void);
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+  }
+  .screenshot-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+  .screenshot-slot:hover img { opacity: 1; }
+  .screenshot-slot .view-label {
+    position: absolute;
+    bottom: 2px;
+    left: 4px;
+    font-size: 9px;
+    color: var(--green);
+    opacity: 0.7;
+    letter-spacing: 1px;
+  }
+  .no-probe-selected {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 1px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .no-probe-selected .icon {
+    font-size: 32px;
+    opacity: 0.3;
+  }
+
+  /* SEED FINDER TAB */
+  .seed-finder {
+    padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .seed-finder::-webkit-scrollbar { width: 4px; }
+  .seed-finder::-webkit-scrollbar-track { background: var(--panel); }
+  .seed-finder::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .sf-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .sf-input {
+    background: var(--void);
+    border: 1px solid var(--border2);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 8px 10px;
+    width: 100%;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .sf-input:focus { border-color: var(--green2); }
+  .sf-input::placeholder { color: var(--text-dim); }
+  .sf-btn {
+    background: var(--green-dim);
+    border: 1px solid var(--green2);
+    color: var(--green);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 10px;
+    width: 100%;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .sf-btn:hover { background: var(--green); color: var(--void); }
+  .sf-results {
+    background: var(--void);
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    padding: 12px;
+    flex: 1;
+    min-height: 120px;
+  }
+  .sf-result-item {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .sf-result-item:last-child { border-bottom: none; }
+  .sf-result-item:hover { color: var(--cyan); }
+  .sf-result-rank {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .sf-result-seed {
+    font-size: 14px;
+    color: var(--amber);
+    font-family: var(--sans);
+    font-weight: 600;
+  }
+  .sf-result-dist {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .sf-empty { color: var(--text-dim); font-size: 11px; letter-spacing: 0.5px; }
+
+  /* TOP BAR (above 3D view) */
+  .topbar {
+    border-bottom: 1px solid var(--border2);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 40px;
+    background: var(--panel);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .topbar-stat { display: flex; align-items: center; gap: 6px; }
+  .topbar-stat strong { color: var(--green); }
+  .topbar-sep { color: var(--border2); }
+
+  /* 3D VIEWPORT */
+  .viewport {
+    position: relative;
+    overflow: hidden;
+    background: var(--void);
+  }
+  #void-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* VIEWPORT HUD */
+  .hud {
+    position: absolute;
+    pointer-events: none;
+  }
+  .hud-tl {
+    top: 16px; left: 16px;
+    font-size: 10px;
+    color: var(--green);
+    opacity: 0.7;
+    line-height: 1.8;
+    letter-spacing: 1px;
+  }
+  .hud-br {
+    bottom: 16px; right: 16px;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    line-height: 1.8;
+    letter-spacing: 0.5px;
+  }
+  .hud-br span { color: var(--cyan); }
+
+  /* TOOLTIP */
+  #tooltip {
+    position: absolute;
+    background: var(--panel);
+    border: 1px solid var(--green2);
+    padding: 8px 12px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 50;
+    max-width: 220px;
+    border-radius: 2px;
+    line-height: 1.7;
+    box-shadow: 0 0 20px var(--green-dim);
+  }
+  #tooltip strong { color: var(--green); display: block; margin-bottom: 4px; font-family: var(--sans); font-size: 13px; letter-spacing: 1px; }
+  #tooltip .tc { color: var(--cyan); }
+  #tooltip .ta { color: var(--amber); }
+
+  /* IMPORT PANEL */
+  .import-area {
+    padding: 16px;
+    border-bottom: 1px solid var(--border2);
+    flex-shrink: 0;
+  }
+  .import-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .import-drop {
+    border: 1px dashed var(--border2);
+    background: var(--void);
+    border-radius: 2px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .import-drop:hover, .import-drop.dragover { border-color: var(--green2); background: var(--green-dim); }
+  .import-drop input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .import-drop-text { font-size: 11px; color: var(--text-dim); letter-spacing: 0.5px; }
+  .import-drop-text strong { color: var(--green); display: block; margin-bottom: 2px; }
+  .import-file-list {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--cyan);
+    max-height: 60px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+
+  /* LIGHTBOX */
+  #lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img {
+    max-width: 90vw;
+    max-height: 85vh;
+    border: 1px solid var(--green2);
+    box-shadow: 0 0 60px var(--green-dim);
+  }
+  #panorama-wrap {
+    width: 90vw;
+    height: 80vh;
+    border: 1px solid var(--green2);
+    box-shadow: 0 0 60px var(--green-dim);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #lightbox-close {
+    position: absolute;
+    top: 20px; right: 24px;
+    font-size: 24px;
+    color: var(--text);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: var(--mono);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    z-index: 10;
+  }
+  #lightbox-close:hover { opacity: 1; }
+  .pano-btn {
+    grid-column: span 2;
+    margin: 4px 0 0;
+    background: var(--cyan-dim);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 7px;
+    width: 100%;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .pano-btn:hover { background: var(--cyan); color: var(--void); }
+
+  /* LEGEND */
+  .legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(10,10,16,0.85);
+    border: 1px solid var(--border2);
+    padding: 10px 14px;
+    border-radius: 2px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    line-height: 2;
+    pointer-events: none;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .legend-dot.spawn { background: #00ccff; }
+  .legend-dot.land { background: #00ff88; }
+  .legend-dot.floor { background: #ff4444; }
+  .legend-dot.waypoint { background: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+  .legend-dot.selected { background: #ffffff; box-shadow: 0 0 8px #ffffff; }
+
+  /* GRID LINES label */
+  .axis-label {
+    position: absolute;
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.4;
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  /* demo notice */
+  .demo-notice {
+    background: var(--amber-dim);
+    border: 1px solid var(--amber);
+    border-radius: 2px;
+    padding: 8px 12px;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+    margin: 0 16px 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- WARNING MODAL -->
+<div id="warning-overlay" style="
+  position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,0.92);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);
+">
+  <div style="
+    max-width:520px;width:90%;
+    background:var(--panel);
+    border:1px solid var(--red);
+    box-shadow:0 0 60px #ff444433, 0 0 120px #ff444411;
+    padding:32px 36px;
+    position:relative;
+  ">
+    <!-- Corner decorations -->
+    <div style="position:absolute;top:8px;left:8px;width:14px;height:14px;border-top:2px solid var(--red);border-left:2px solid var(--red);"></div>
+    <div style="position:absolute;top:8px;right:8px;width:14px;height:14px;border-top:2px solid var(--red);border-right:2px solid var(--red);"></div>
+    <div style="position:absolute;bottom:8px;left:8px;width:14px;height:14px;border-bottom:2px solid var(--red);border-left:2px solid var(--red);"></div>
+    <div style="position:absolute;bottom:8px;right:8px;width:14px;height:14px;border-bottom:2px solid var(--red);border-right:2px solid var(--red);"></div>
+
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:11px;letter-spacing:4px;color:var(--red);margin-bottom:10px;">⚠ &nbsp; PROBE TERMINAL &nbsp; ⚠</div>
+      <div style="font-size:26px;font-weight:700;letter-spacing:6px;color:var(--red);font-family:var(--sans);">WARNING</div>
+    </div>
+
+    <div style="color:var(--text);font-size:12px;line-height:1.9;letter-spacing:0.4px;margin-bottom:24px;">
+      <p style="margin-bottom:14px;">
+        This website will <span style="color:var(--amber);">spoil the layout of the map</span>, including the door to the ending
+        <span style="color:var(--text-dim);font-size:10px;">(it's unclear whether that position resets between sessions)</span>.
+      </p>
+      <p>
+        I'm aware that this probe is <span style="color:var(--amber);">breaking SVO rules</span>. If Nox doesn't like this, I will shut down the probe and everything including this website.
+        <br><br>
+        <span style="color:var(--red);">If you want to play the game legitimately — do not use this website.</span>
+        <br><br>
+        <span style="color:var(--green);">Otherwise, welcome in.</span>
+      </p>
+    </div>
+
+    <div style="display:flex;gap:12px;">
+      <button onclick="dismissWarning()" style="
+        flex:1;padding:11px;
+        background:var(--green-dim);border:1px solid var(--green);
+        color:var(--green);font-family:var(--mono);font-size:12px;
+        letter-spacing:2px;cursor:pointer;
+        transition:all 0.2s;
+      " onmouseover="this.style.background='var(--green)';this.style.color='var(--void)'"
+         onmouseout="this.style.background='var(--green-dim)';this.style.color='var(--green)'">
+        I UNDERSTAND — ENTER
+      </button>
+      <button onclick="window.close()" style="
+        flex:1;padding:11px;
+        background:var(--red-dim);border:1px solid var(--red);
+        color:var(--red);font-family:var(--mono);font-size:12px;
+        letter-spacing:2px;cursor:pointer;
+        transition:all 0.2s;
+      " onmouseover="this.style.background='var(--red)';this.style.color='var(--void)'"
+         onmouseout="this.style.background='var(--red-dim)';this.style.color='var(--red)'">
+        LEAVE
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function dismissWarning() {
+  document.getElementById('warning-overlay').style.display = 'none';
+}
+</script>
+<header>
+  <div class="logo">SOURCEVOID <span>ONLINE</span></div>
+  <div class="status-bar">
+    <div class="status-item" id="hdr-probe-count">0 sessions</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('probes')">Probes</button>
+      <button class="tab" onclick="switchTab('seed')">Seed Finder</button>
+    </div>
+
+    <!-- PROBES TAB -->
+    <div class="tab-content active" id="tab-probes">
+      <div class="import-area">
+        <div class="import-label">Data source</div>
+        <div id="server-status-box" style="
+          background:var(--void);border:1px solid var(--border2);border-radius:2px;
+          padding:10px 12px;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="dot" id="server-dot" style="background:var(--text-dim);animation:none;"></div>
+            <span id="server-status-text" style="font-size:11px;letter-spacing:1px;color:var(--text-dim);">loading…</span>
+          </div>
+          <div id="server-path" style="font-size:9px;color:var(--text-dim);letter-spacing:0.5px;margin-top:2px;">
+            run push.bat to sync your findings to github
+          </div>
+        </div>
+        <button class="sf-btn" style="margin-top:8px;" onclick="loadFindings()">↺ Refresh</button>
+      </div>
+      <div class="demo-notice" id="demo-notice">
+        No probe data found — showing demo entries.
+      </div>
+      <div class="probe-list-header">
+        <span class="probe-count">Sessions: <strong id="probe-count-num">0</strong></span>
+        <span class="probe-count" id="map-count-label">Maps: <strong>0</strong></span>
+      </div>
+      <div class="probe-list" id="probe-list"></div>
+
+      <!-- PROBE DETAIL -->
+      <div id="probe-detail-wrap" style="display:none; flex-direction:column; flex-shrink:0;">
+        <div class="screenshots" id="screenshots"></div>
+        <div class="detail-panel" id="detail-panel">
+          <h3>Session data</h3>
+          <div id="detail-rows"></div>
+        </div>
+      </div>
+      <div class="no-probe-selected" id="no-probe-hint">
+        <div class="icon">⊕</div>
+        <span>select a session</span>
+      </div>
+    </div>
+
+    <!-- SEED FINDER TAB -->
+    <div class="tab-content" id="tab-seed">
+      <div class="seed-finder">
+        <div>
+          <div class="sf-label">Target X</div>
+          <input class="sf-input" type="number" id="sf-x" placeholder="-28.21">
+        </div>
+        <div>
+          <div class="sf-label">Target Z</div>
+          <input class="sf-input" type="number" id="sf-z" placeholder="322.55">
+        </div>
+        <div>
+          <div class="sf-label">Max results</div>
+          <input class="sf-input" type="number" id="sf-max" value="5" min="1" max="20">
+        </div>
+        <button class="sf-btn" onclick="findClosestSeeds()">Find closest seeds</button>
+        <div class="sf-results" id="sf-results">
+          <div class="sf-empty">Enter target coordinates and hit find. Ranked by distance from spawn (X/Z only — Y varies).</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT SIDE -->
+  <div style="display:flex; flex-direction:column; overflow:hidden;">
+
+    <div class="topbar">
+      <div class="topbar-stat">DOOR: <strong>-727, -3000, -373</strong></div>
+      <div class="topbar-sep">|</div>
+      <div class="topbar-stat" style="color:var(--text-dim);">scroll to zoom · drag to orbit · right-drag to pan</div>
+    </div>
+
+    <div class="viewport" style="flex:1;">
+      <canvas id="void-canvas"></canvas>
+
+      <div class="hud hud-tl" id="hud-tl"></div>
+      <div class="hud hud-br" id="hud-br"></div>
+
+      <div id="tooltip"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- LIGHTBOX / PANORAMA -->
+<div id="lightbox">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <!-- Single image mode -->
+  <img id="lightbox-img" src="" alt="">
+  <!-- Panorama mode -->
+  <div id="panorama-wrap" style="display:none;width:100%;height:100%;position:relative;">
+    <canvas id="pano-canvas" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
+    <div id="pano-hint" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--green);opacity:0.7;letter-spacing:1px;pointer-events:none;">DRAG TO LOOK AROUND · SCROLL TO ZOOM</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA STORE
+// ═══════════════════════════════════════════════════════
+let probes = []; // array of probe session objects
+let selectedProbe = null;
+
+// DEMO DATA (shown until real files loaded)
+const DEMO_PROBES = [
+  {
+    id: 'demo1',
+    map: 'rp_serioustown',
+    seed: 1776805778,
+    coords: [-28.21, 2256.70, 322.55],
+    startCoords: [-28.21, 2389.85, 322.55],
+    filename: 'probe_1776805778_2026-04-21T22-13-13',
+    demo: true
+  },
+  {
+    id: 'demo2',
+    map: 'gm_construct',
+    seed: 923456789,
+    coords: [1200.5, -150.0, -800.3],
+    startCoords: [1200.5, 3200.0, -800.3],
+    filename: null,
+    demo: true
+  },
+  {
+    id: 'demo3',
+    map: 'de_dust2',
+    seed: 3141592653,
+    coords: [-2100.0, -2850.0, 1900.0],
+    startCoords: [-2100.0, 3800.0, 1900.0],
+    filename: null,
+    demo: true,
+    floorHit: true
+  },
+  {
+    id: 'demo4',
+    map: 'gm_bigcity',
+    seed: 777123456,
+    coords: [3400.0, 180.0, -3100.0],
+    startCoords: [3400.0, 2800.0, -3100.0],
+    filename: null,
+    demo: true
+  },
+  {
+    id: 'demo5',
+    map: 'rp_downtown_v2',
+    seed: 42069420,
+    coords: [500.0, 1100.0, 2700.0],
+    startCoords: [500.0, 3500.0, 2700.0],
+    filename: null,
+    demo: true
+  },
+];
+
+let usingDemoData = true;
+
+// ═══════════════════════════════════════════════════════
+// SERVER-BASED DATA LOADING
+// ═══════════════════════════════════════════════════════
+function parseTxtContent(text, sessionId) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const obj = { id: sessionId };
+  for (const line of lines) {
+    if (line.startsWith('MAP NAME:')) obj.map = line.replace('MAP NAME:', '').trim();
+    if (line.startsWith('COORDS:')) {
+      const m = line.match(/\(([^)]+)\)/);
+      if (m) obj.coords = m[1].split(',').map(Number);
+    }
+    if (line.startsWith('STARTING COORDS:')) {
+      const m = line.match(/\(([^)]+)\)/);
+      if (m) obj.startCoords = m[1].split(',').map(Number);
+    }
+    if (line.startsWith('SEED:')) obj.seed = line.replace('SEED:', '').trim();
+  }
+  if (obj.coords && obj.coords[1] <= -2900) obj.floorHit = true;
+  return obj;
+}
+
+function setServerStatus(state, text) {
+  // state: 'ok' | 'error' | 'loading'
+  const dot  = document.getElementById('server-dot');
+  const label = document.getElementById('server-status-text');
+  dot.style.animation = state === 'ok' ? '' : 'none';
+  dot.style.background = state === 'ok' ? 'var(--green)' : state === 'error' ? 'var(--red)' : 'var(--amber)';
+  label.style.color    = state === 'ok' ? 'var(--green)' : state === 'error' ? 'var(--red)' : 'var(--amber)';
+  label.textContent = text;
+}
+
+async function loadFindings() {
+  setServerStatus('loading', 'loading…');
+  let data;
+  try {
+    const r = await fetch('findings.json');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    data = await r.json();
+  } catch (e) {
+    setServerStatus('error', 'findings.json not found — run push.bat');
+    return;
+  }
+
+  if (!data.sessions || data.sessions.length === 0) {
+    setServerStatus('error', 'no sessions found — run push.bat');
+    return;
+  }
+
+  setServerStatus('loading', `loading ${data.sessions.length} session(s)…`);
+
+  const newProbes = [];
+  for (const session of data.sessions) {
+    // session already has all parsed fields baked in by push.bat
+    // imageUrls are relative paths like findings/mapname/probe_xxx_view_1.png
+    newProbes.push(session);
+  }
+
+  probes = newProbes;
+  usingDemoData = false;
+  document.getElementById('demo-notice').style.display = 'none';
+  selectedProbe = null;
+  renderProbeList();
+  rebuildScene();
+  updateStats();
+
+  const imgCount = newProbes.reduce((s, p) => s + (p.imageUrls ? p.imageUrls.length : 0), 0);
+  setServerStatus('ok', `${newProbes.length} session(s) · ${imgCount} image(s)`);
+}
+
+// Auto-load on page start
+window.addEventListener('load', () => {
+  loadFindings().catch(() => setServerStatus('error', 'could not load findings.json'));
+});
+
+// ═══════════════════════════════════════════════════════
+// UI RENDERING
+// ═══════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['probes', 'seed'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach((c, i) => {
+    c.classList.toggle('active', ['probes', 'seed'][i] === name);
+  });
+}
+
+function renderProbeList() {
+  const list = document.getElementById('probe-list');
+  const data = usingDemoData ? DEMO_PROBES : probes;
+  list.innerHTML = '';
+  for (const p of data) {
+    const el = document.createElement('div');
+    el.className = 'probe-item' + (selectedProbe && selectedProbe.id === p.id ? ' selected' : '');
+    el.innerHTML = `
+      <div class="probe-item-map">${p.map || 'UNKNOWN'}</div>
+      <div class="probe-item-seed">seed: ${p.seed || '?'} ${p.floorHit ? '<span style="color:#ff4444">[floor]</span>' : ''}</div>
+      <div class="probe-item-coords">${p.coords ? p.coords.map(n => n.toFixed(1)).join(', ') : ''}</div>
+    `;
+    el.onclick = () => selectProbe(p);
+    list.appendChild(el);
+  }
+  updateStats();
+}
+
+function updateStats() {
+  const data = usingDemoData ? DEMO_PROBES : probes;
+  document.getElementById('probe-count-num').textContent = data.length;
+  const maps = new Set(data.map(p => p.map)).size;
+  document.getElementById('map-count-label').innerHTML = `Maps: <strong>${maps}</strong>`;
+  document.getElementById('hdr-probe-count').textContent = `${data.length} session${data.length !== 1 ? 's' : ''}`;
+}
+
+function selectProbe(p) {
+  selectedProbe = p;
+  renderProbeList();
+  highlightProbeInScene(p);
+
+  // Show detail
+  document.getElementById('probe-detail-wrap').style.display = 'flex';
+  document.getElementById('no-probe-hint').style.display = 'none';
+
+  // Screenshots
+  const ss = document.getElementById('screenshots');
+  ss.innerHTML = '';
+  if (!p.demo) {
+    const urls = p.imageUrls || [];
+    if (urls.length > 0) {
+      const availableViews = [];
+      for (let i = 0; i < Math.min(4, urls.length); i++) {
+        const url = urls[i];
+        availableViews.push(url);
+        const slot = document.createElement('div');
+        slot.className = 'screenshot-slot';
+        slot.innerHTML = `<img src="${url}" alt="View ${i+1}"><div class="view-label">VIEW ${i+1}</div>`;
+        slot.onclick = () => openLightbox(url);
+        ss.appendChild(slot);
+      }
+      if (availableViews.length === 4) {
+        const pb = document.createElement('button');
+        pb.className = 'pano-btn';
+        pb.textContent = '⊕ VIEW 360° PANORAMA';
+        pb.onclick = () => openPanorama(availableViews);
+        ss.appendChild(pb);
+      }
+    } else {
+      ss.innerHTML = `<div style="grid-column:span 2;padding:10px;color:var(--text-dim);font-size:10px;letter-spacing:0.5px;">No images found for this session.</div>`;
+    }
+  } else {
+    ss.innerHTML = `<div style="grid-column:span 2;padding:10px;color:var(--text-dim);font-size:10px;letter-spacing:0.5px;">[DEMO — no screenshots]</div>`;
+  }
+
+  // Detail rows
+  const dr = document.getElementById('detail-rows');
+  const landY = p.coords ? p.coords[1].toFixed(2) : '?';
+  const floorDist = p.coords ? (p.coords[1] - (-3000)).toFixed(1) : '?';
+  dr.innerHTML = `
+    <div class="detail-row"><span class="detail-label">Map</span><span class="detail-value green">${p.map || '?'}</span></div>
+    <div class="detail-row"><span class="detail-label">Seed</span><span class="detail-value amber">${p.seed || '?'}</span></div>
+    <div class="detail-row"><span class="detail-label">Spawn XYZ</span><span class="detail-value cyan">${p.startCoords ? p.startCoords.map(n => n.toFixed(1)).join(', ') : '?'}</span></div>
+    <div class="detail-row"><span class="detail-label">Landing XYZ</span><span class="detail-value cyan">${p.coords ? p.coords.map(n => n.toFixed(1)).join(', ') : '?'}</span></div>
+    <div class="detail-row"><span class="detail-label">Fall distance</span><span class="detail-value">${p.startCoords && p.coords ? (p.startCoords[1] - p.coords[1]).toFixed(1) : '?'}</span></div>
+    <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value" style="color:${p.floorHit ? 'var(--red)' : 'var(--green)'}">${p.floorHit ? 'hit the floor' : 'landed on map'}</span></div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+// SEED FINDER
+// ═══════════════════════════════════════════════════════
+function findClosestSeeds() {
+  const tx = parseFloat(document.getElementById('sf-x').value);
+  const tz = parseFloat(document.getElementById('sf-z').value);
+  const max = parseInt(document.getElementById('sf-max').value) || 5;
+  const res = document.getElementById('sf-results');
+
+  if (isNaN(tx) || isNaN(tz)) {
+    res.innerHTML = '<div class="sf-empty" style="color:var(--red);">not valid x and z coords </div>';
+    return;
+  }
+
+  const data = usingDemoData ? DEMO_PROBES : probes;
+  if (data.length === 0) {
+    res.innerHTML = '<div class="sf-empty">no probe data</div>';
+    return;
+  }
+
+  const scored = data.filter(p => p.startCoords).map(p => {
+    const dx = p.startCoords[0] - tx;
+    const dz = p.startCoords[2] - tz;
+    return { probe: p, dist: Math.sqrt(dx * dx + dz * dz) };
+  });
+  scored.sort((a, b) => a.dist - b.dist);
+  const top = scored.slice(0, max);
+
+  if (top.length === 0) {
+    res.innerHTML = '<div class="sf-empty">no seeds found</div>';
+    return;
+  }
+
+  res.innerHTML = '';
+  top.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'sf-result-item';
+    el.innerHTML = `
+      <div class="sf-result-rank">#${i + 1}</div>
+      <div class="sf-result-seed">${s.probe.seed}</div>
+      <div class="sf-result-dist">
+        MAP: ${s.probe.map} &nbsp;|&nbsp; DIST: ${s.dist.toFixed(1)} units<br>
+        SPAWN: (${s.probe.startCoords[0].toFixed(1)}, ${s.probe.startCoords[2].toFixed(1)})
+      </div>
+    `;
+    el.onclick = () => selectProbe(s.probe);
+    res.appendChild(el);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// LIGHTBOX
+// ═══════════════════════════════════════════════════════
+function openLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox-img').style.display = 'block';
+  document.getElementById('panorama-wrap').style.display = 'none';
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  stopPanorama();
+}
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeLightbox();
+});
+
+// ═══════════════════════════════════════════════════════
+// PANORAMA VIEWER (4 × 90° images stitched as cube faces)
+// ═══════════════════════════════════════════════════════
+let panoRenderer = null, panoScene = null, panoCamera = null, panoAnimId = null;
+let panoDragging = false, panoLastX = 0, panoLastY = 0;
+let panoYaw = 0, panoPitch = 0;
+
+function openPanorama(urls) {
+  document.getElementById('lightbox-img').style.display = 'none';
+  document.getElementById('panorama-wrap').style.display = 'block';
+  document.getElementById('lightbox').classList.add('open');
+
+  const canvas = document.getElementById('pano-canvas');
+  stopPanorama();
+
+  // Load all 4 images then build the scene
+  Promise.all(urls.map(u => new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = u;
+  }))).then(imgs => buildPanorama(canvas, imgs));
+}
+
+function buildPanorama(canvas, imgs) {
+  // Set canvas size
+  const wrap = document.getElementById('panorama-wrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+
+  panoRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  panoRenderer.setPixelRatio(window.devicePixelRatio);
+  panoRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
+
+  panoScene = new THREE.Scene();
+  panoCamera = new THREE.PerspectiveCamera(75, wrap.clientWidth / wrap.clientHeight, 0.1, 100);
+  panoCamera.position.set(0, 0, 0);
+
+  // The 4 images are taken 90° apart (view_1=N, view_2=E, view_3=S, view_4=W)
+  // We place them as 4 quad faces of a cylinder (equirectangular approximation via box faces)
+  // Each image covers a 90° horizontal wedge on a large sphere
+  const radius = 50;
+  const faceAngles = [0, -Math.PI/2, Math.PI, Math.PI/2]; // N, E, S, W in Three.js (Z-forward = 0 rotation)
+
+  for (let i = 0; i < 4; i++) {
+    const tex = new THREE.CanvasTexture(imgs[i]);
+    tex.minFilter = THREE.LinearFilter;
+    const geo = new THREE.PlaneGeometry(
+      2 * radius * Math.tan(Math.PI / 4), // width = 2 * r * tan(45°) = 2r
+      radius * 1.5 // tall enough to fill vertical FOV
+    );
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Position each panel at radius distance, rotated around Y
+    mesh.position.set(
+      radius * Math.sin(faceAngles[i]),
+      0,
+      radius * Math.cos(faceAngles[i])
+    );
+    mesh.rotation.y = faceAngles[i];
+    panoScene.add(mesh);
+  }
+
+  // Mouse drag controls
+  canvas.addEventListener('mousedown', panoMouseDown);
+  canvas.addEventListener('wheel', panoWheel, { passive: false });
+  window.addEventListener('mousemove', panoMouseMove);
+  window.addEventListener('mouseup', panoMouseUp);
+  canvas.style.cursor = 'grab';
+
+  function panoLoop() {
+    panoAnimId = requestAnimationFrame(panoLoop);
+    // Apply yaw/pitch to camera via quaternion
+    const q = new THREE.Quaternion();
+    q.setFromEuler(new THREE.Euler(panoPitch, panoYaw, 0, 'YXZ'));
+    panoCamera.quaternion.copy(q);
+    panoRenderer.render(panoScene, panoCamera);
+  }
+  panoLoop();
+}
+
+function panoMouseDown(e) {
+  panoDragging = true;
+  panoLastX = e.clientX; panoLastY = e.clientY;
+  document.getElementById('pano-canvas').style.cursor = 'grabbing';
+}
+function panoMouseMove(e) {
+  if (!panoDragging) return;
+  const dx = e.clientX - panoLastX;
+  const dy = e.clientY - panoLastY;
+  panoYaw -= dx * 0.004;
+  panoPitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, panoPitch - dy * 0.004));
+  panoLastX = e.clientX; panoLastY = e.clientY;
+}
+function panoMouseUp() {
+  panoDragging = false;
+  const c = document.getElementById('pano-canvas');
+  if (c) c.style.cursor = 'grab';
+}
+function panoWheel(e) {
+  e.preventDefault();
+  if (!panoCamera) return;
+  panoCamera.fov = Math.max(30, Math.min(100, panoCamera.fov + e.deltaY * 0.05));
+  panoCamera.updateProjectionMatrix();
+}
+
+function stopPanorama() {
+  if (panoAnimId) { cancelAnimationFrame(panoAnimId); panoAnimId = null; }
+  const canvas = document.getElementById('pano-canvas');
+  canvas.removeEventListener('mousedown', panoMouseDown);
+  canvas.removeEventListener('wheel', panoWheel);
+  window.removeEventListener('mousemove', panoMouseMove);
+  window.removeEventListener('mouseup', panoMouseUp);
+  if (panoRenderer) { panoRenderer.dispose(); panoRenderer = null; }
+  panoScene = null; panoCamera = null;
+}
+
+// ═══════════════════════════════════════════════════════
+// THREE.JS VOID MAP
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('void-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x050508, 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 1, 50000);
+camera.position.set(2000, 1500, 2500);
+camera.lookAt(0, -1000, 0);
+
+// Scale: game units → three units. 1:1 but we compress Y for readability
+const SCALE = 1;
+const Y_SCALE = 0.4; // compress Y so the map doesn't look too tall
+
+function gU(x, y, z) {
+  // Convert game units to Three.js coords
+  // Game: X = left/right, Y = up/down, Z = forward/back
+  // Three: X = right, Y = up, Z = toward camera
+  return new THREE.Vector3(x * SCALE, y * Y_SCALE * SCALE, z * SCALE);
+}
+
+// --- GRID FLOOR (source floor at y=-3000) ---
+function makeGrid() {
+  const size = 2000;
+  const divs = 20;
+  const mat = new THREE.LineBasicMaterial({ color: 0x1a1a2e, transparent: true, opacity: 0.8 });
+  const geo = new THREE.BufferGeometry();
+  const pts = [];
+  const step = size / divs;
+  const fy = -3000 * Y_SCALE;
+  for (let i = 0; i <= divs; i++) {
+    const v = -size / 2 + i * step;
+    pts.push(-size / 2, fy, v,  size / 2, fy, v);
+    pts.push(v, fy, -size / 2,  v, fy, size / 2);
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return new THREE.LineSegments(geo, mat);
+}
+scene.add(makeGrid());
+
+// --- BOUNDARY WALLS (outline box) ---
+function makeBounds() {
+  const hw = 1000;
+  const yTop = 3800 * Y_SCALE;
+  const yBot = -3000 * Y_SCALE;
+  const corners = [
+    [-hw, -hw], [-hw, hw], [hw, hw], [hw, -hw], [-hw, -hw]
+  ];
+  const mat = new THREE.LineBasicMaterial({ color: 0x222240, transparent: true, opacity: 0.5 });
+  const pts = [];
+  for (let i = 0; i < corners.length - 1; i++) {
+    pts.push(corners[i][0], yBot, corners[i][1]);
+    pts.push(corners[i + 1][0], yBot, corners[i + 1][1]);
+    pts.push(corners[i][0], yTop, corners[i][1]);
+    pts.push(corners[i + 1][0], yTop, corners[i + 1][1]);
+    pts.push(corners[i][0], yBot, corners[i][1]);
+    pts.push(corners[i][0], yTop, corners[i][1]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return new THREE.LineSegments(geo, mat);
+}
+scene.add(makeBounds());
+
+// --- FLOOR PLANE ---
+const floorPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.MeshBasicMaterial({ color: 0x0a0015, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+);
+floorPlane.rotation.x = -Math.PI / 2;
+floorPlane.position.y = -3000 * Y_SCALE;
+scene.add(floorPlane);
+
+// --- WAYPOINT ---
+const waypointPos = gU(-727, -3000, -373);
+const waypointGeo = new THREE.OctahedronGeometry(60);
+const waypointMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
+const waypoint = new THREE.Mesh(waypointGeo, waypointMat);
+waypoint.position.copy(waypointPos);
+scene.add(waypoint);
+
+// Waypoint glow ring
+const ringGeo = new THREE.RingGeometry(80, 90, 32);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.position.copy(waypointPos);
+ring.rotation.x = -Math.PI / 2;
+scene.add(ring);
+
+// --- PROBE OBJECTS ---
+let probeObjects = [];
+let spawnObjects = [];
+let lineObjects = [];
+let probeData3D = []; // {probe, spawnMesh, landMesh, line}
+
+function rebuildScene() {
+  // Remove old
+  for (const obj of [...probeObjects, ...spawnObjects, ...lineObjects]) scene.remove(obj);
+  probeObjects = []; spawnObjects = []; lineObjects = []; probeData3D = [];
+
+  const data = usingDemoData ? DEMO_PROBES : probes;
+  for (const p of data) {
+    if (!p.coords || !p.startCoords) continue;
+    addProbeToScene(p);
+  }
+}
+
+function addProbeToScene(p) {
+  const spawnPos = gU(p.startCoords[0], p.startCoords[1], p.startCoords[2]);
+  const landPos = gU(p.coords[0], p.coords[1], p.coords[2]);
+
+  // Spawn sphere (cyan, small)
+  const sMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(30, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.7 })
+  );
+  sMesh.position.copy(spawnPos);
+  sMesh.userData = { probe: p, type: 'spawn' };
+  scene.add(sMesh);
+  spawnObjects.push(sMesh);
+
+  // Land sphere
+  const color = p.floorHit ? 0xff4444 : 0x00ff88;
+  const lMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(45, 10, 10),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
+  );
+  lMesh.position.copy(landPos);
+  lMesh.userData = { probe: p, type: 'land' };
+  scene.add(lMesh);
+  probeObjects.push(lMesh);
+
+  // Fall line
+  const linePts = [spawnPos, landPos];
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x334455, transparent: true, opacity: 0.5 });
+  const line = new THREE.Line(lineGeo, lineMat);
+  scene.add(line);
+  lineObjects.push(line);
+
+  probeData3D.push({ probe: p, spawnMesh: sMesh, landMesh: lMesh, line });
+}
+
+function highlightProbeInScene(p) {
+  // Reset all
+  for (const o of probeData3D) {
+    const landColor = o.probe.floorHit ? 0xff4444 : 0x00ff88;
+    o.landMesh.material.color.setHex(landColor);
+    o.landMesh.scale.setScalar(1);
+    o.spawnMesh.material.color.setHex(0x00ccff);
+    o.line.material.opacity = 0.5;
+    o.line.material.color.setHex(0x334455);
+  }
+  // Highlight selected
+  const found = probeData3D.find(o => o.probe.id === p.id);
+  if (found) {
+    found.landMesh.material.color.setHex(0xffffff);
+    found.landMesh.scale.setScalar(1.8);
+    found.spawnMesh.material.color.setHex(0xffffff);
+    found.line.material.opacity = 1;
+    found.line.material.color.setHex(0x00ff88);
+    // Move camera toward it
+    const target = found.landMesh.position.clone();
+    cameraTarget.copy(target);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ORBIT CONTROLS (manual)
+// ═══════════════════════════════════════════════════════
+let isDragging = false;
+let isRightDragging = false;
+let lastMouse = { x: 0, y: 0 };
+let spherical = { theta: 0.6, phi: 0.9, radius: 3500 };
+let cameraTarget = new THREE.Vector3(0, -1000, 0);
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) { isRightDragging = true; e.preventDefault(); }
+  else { isDragging = true; }
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mouseup', () => { isDragging = false; isRightDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (isDragging) {
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    spherical.theta -= dx * 0.005;
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi - dy * 0.005));
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+  if (isRightDragging) {
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), up).normalize();
+    cameraTarget.addScaledVector(right, dx * 3);
+    cameraTarget.y += dy * 3;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+  handleHover(e);
+});
+canvas.addEventListener('wheel', e => {
+  spherical.radius = Math.max(100, Math.min(8000, spherical.radius + e.deltaY * 1.2));
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ═══════════════════════════════════════════════════════
+// RAYCASTING / HOVER
+// ═══════════════════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 50;
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip');
+
+function handleHover(e) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const allMeshes = [...probeObjects, ...spawnObjects];
+  const hits = raycaster.intersectObjects(allMeshes);
+  if (hits.length > 0) {
+    const obj = hits[0].object;
+    const p = obj.userData.probe;
+    const type = obj.userData.type;
+    if (p) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX - canvas.getBoundingClientRect().left + 14) + 'px';
+      tooltip.style.top = (e.clientY - canvas.getBoundingClientRect().top + 14) + 'px';
+      const c = type === 'spawn' ? p.startCoords : p.coords;
+      tooltip.innerHTML = `
+        <strong>${p.map || 'UNKNOWN'}</strong>
+        <span class="ta">SEED: ${p.seed}</span><br>
+        <span class="tc">${type.toUpperCase()}: (${c.map(n => n.toFixed(1)).join(', ')})</span><br>
+        ${p.floorHit ? '<span style="color:#ff4444">⚠ hit the floor</span>' : '<span style="color:#00ff88">● on map</span>'}
+      `;
+      canvas.style.cursor = 'pointer';
+    }
+  } else {
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'grab';
+  }
+}
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([...probeObjects, ...spawnObjects]);
+  if (hits.length > 0) {
+    const p = hits[0].object.userData.probe;
+    if (p) {
+      selectProbe(p);
+      switchTab('probes');
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════════════
+function resize() {
+  const w = canvas.parentElement.clientWidth;
+  const h = canvas.parentElement.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ═══════════════════════════════════════════════════════
+// ANIMATE
+// ═══════════════════════════════════════════════════════
+let tick = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  tick++;
+
+  // Update camera from spherical
+  const x = cameraTarget.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  const y = cameraTarget.y + spherical.radius * Math.cos(spherical.phi);
+  const z = cameraTarget.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(cameraTarget);
+
+  // Rotate waypoint
+  waypoint.rotation.y = tick * 0.01;
+  ring.rotation.z = tick * 0.005;
+
+  // Pulse selected probes
+  for (const o of probeData3D) {
+    if (selectedProbe && o.probe.id === selectedProbe.id) {
+      const s = 1.8 + Math.sin(tick * 0.05) * 0.3;
+      o.landMesh.scale.setScalar(s);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+rebuildScene();
+renderProbeList();
+animate();
+</script>
+</body>
+</html>
