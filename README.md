@@ -1,14 +1,8 @@
-# \# svo probe visualizer
+# svo probe visualizer
 
-# probe visualizer for my probes
+probe visualizer for my probes
 
-# 
+thats pretty much it
 
-# thats pretty much it
-
-# 
-
-# also code is obfuscated fuh yall
-
-# 
+also code is obfuscated fuh yall
 
