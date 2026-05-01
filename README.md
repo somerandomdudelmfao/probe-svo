@@ -4,5 +4,5 @@ probe visualizer for my probes
 
 thats pretty much it
 
-also code is obfuscated fuh yall
-
+code is ai generated btw
+im shit at html, css and js
